@@ -21,31 +21,33 @@
 (require 'cl)
 
 (defvar eyesore-commands
-  '((year 1)
-    (release 3 formats)
-    (formats 1 track)
-    (date 1)
-    (track 1)
-    (writer 1)
-    (coproducer 1)
-    (producer 1)
-    (groove 1)
-    (comments 1)
-    (external 1)
-    (cowriter 1)
-    (band 1)
-    (enter 1)
-    (exit 1)
-    (time 1)
-    (featured 1)
-    (studio 1)
-    (sleeve 1)
-    (excerpt 0)
-    (remix 0)
-    (live 0)
-    (engineer 1)
-    (group 1)
-    (ephemera 1)))
+  '((ryear* nil :year :releases)
+    (year nil :year)
+    (release formats :id :group :album :details)
+    (formats track :formats :tracks)
+    (includes nil :id :format)
+    (date nil :date)
+    (track nil :name :details)
+    (writer nil :name)
+    (coproducer nil :name)
+    (producer nil :name)
+    (groove nil :name)
+    (comments nil :name)
+    (external nil :name)
+    (cowriter nil :name)
+    (band nil :name)
+    (enter nil :name)
+    (exit nil :name)
+    (time nil :name)
+    (featured nil :name)
+    (studio nil :name)
+    (sleeve nil :name)
+    (excerpt nil)
+    (remix nil)
+    (live nil)
+    (engineer nil :name)
+    (group nil :name)
+    (ephemera nil :name)))
 
 (defun eyesore-read ()
   (eyesore-skip-whitespace)
@@ -73,16 +75,18 @@
    'string))
 
 (defun eyesore-read-word ()
-  (coerce
-   (loop for char = (following-char)
-	 while (or (<= ?a char ?z)
-		   (<= ?A char ?A)
-		   (<= ?0 char ?9)
-		   (eql char ?\+)
-		   (eql char ?\*))
-	 collect char
-	 do (forward-char 1))
-   'string))
+  (intern
+   (coerce
+    (loop for char = (following-char)
+	  while (or (<= ?a char ?z)
+		    (<= ?A char ?A)
+		    (<= ?0 char ?9)
+		    (eql char ?\+)
+		    (eql char ?\*))
+	  collect char
+	  do (forward-char 1))
+    'string)
+   obarray))
 
 (defun eyesore-read-list ()
   (loop while (and
@@ -110,6 +114,33 @@
 	t)
        (t nil))
     ))
+
+(defun eyesore-parse (elem &optional default)
+  (let ((type (pop elem)))
+    (when (eq type :default)
+      (setq type default))
+    (let ((spec (assoc type eyesore-commands)))
+      (append
+       (list :type type)
+       (loop for field in (cddr spec)
+	     append (list
+		     field
+		     (let ((sub (pop elem)))
+		       (if (stringp sub)
+			   sub
+			 (loop while sub
+			       collect
+			       (if (stringp (car sub))
+				   (pop sub)
+				 (let ((value (eyesore-parse sub (cadr spec))))
+				   (loop repeat
+					 (1+
+					  (length (or (cddr (assoc
+							     (car value)
+							     eyesore-commands))
+						      '())))
+					 do (pop sub))
+				   value)))))))))))
 
 (provide 'eyesore)
 
