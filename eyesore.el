@@ -170,17 +170,17 @@
 			 (eyesore-external release))))
 	  (insert
 	   (format
-	    "<tr><td>%s&nbsp;%s<td><a href='%s'>%s</a> - %s<tr><td><a href='%s'><img src='%s'></a><td>%s\n\n"
-	    (eyesore-format-imgs release)
-	    (eyesore-spec id (car (eyesore-formats release)))
-	    (eyesore-group-link (getf release :group))
-	    (getf release :group)
-	    (getf release :album)
+	    "<tr><td><a href='%s'><img src='%s'></a><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s\n\n"
 	    (and image
 		 (format "https://eyesore.no/html/wrap/%s.html"
 			 (replace-regexp-in-string "[.]gif$" ".jpg" image)))
 	    (and image
 		 (format "https://eyesore.no/html/gif/%s" image))
+	    (eyesore-format-imgs release)
+	    (eyesore-spec id (car (eyesore-formats release)))
+	    (eyesore-group-link (getf release :group))
+	    (eyesore-string (getf release :group))
+	    (eyesore-string (getf release :album))
 	    (mapconcat
 	     #'identity
 	     (loop for track in (getf (car (getf release :details))
@@ -206,9 +206,7 @@
    ((equal "BAD.*CD" format)
     (format (replace-regexp-in-string " " "%s" format) id))
    ((equal "CAD" format)
-    (format "CAD%S" id))
-   ((equal "CAD" format)
-    (format "CAD%S" id))
+    (format "CAD%s" id))
    ((not (string-match " " format))
     (concat format id))
    (t
@@ -270,7 +268,9 @@
 	 when gif
 	 collect (format "<img src='https://eyesore.no/html/bullet/%s.gif'>" gif))
    ""))
-			  
+
+(defun eyesore-string (string)
+  (replace-regexp-in-string "|.*" "" string))
 
 (provide 'eyesore)
 
