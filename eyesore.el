@@ -153,7 +153,9 @@
 		 collect (eyesore-read))))))
 
 (defun eyesore-format-year (year)
-  (insert (format "<div class='eyesore'><h1>%s</h1>\n<table>\n" year))
+  (insert (format "<div class='eyesore'><h1><a href='https://eyesore.no/html/year/%s.html'>%s</a></h1>\n<table>\n"
+		  year
+		  year))
   (loop for elem in (getf eyesore-data :years)
 	when (equal year (getf elem :year))
 	do (eyesore-format-releases (getf elem :releases)))
@@ -170,7 +172,7 @@
 			 (eyesore-external release))))
 	  (insert
 	   (format
-	    "<tr><td><a href='%s'><img src='%s'></a><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s\n\n"
+	    "<tr><td><a href='%s'><img src='%s'></a></td><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s</td></tr>\n\n"
 	    (and image
 		 (format "https://eyesore.no/html/wrap/%s.html"
 			 (replace-regexp-in-string "[.]gif$" ".jpg" image)))
@@ -237,11 +239,13 @@
   (format "https://eyesore.no/html/group/%s.html" (eyesore-normalise group)))
 
 (defun eyesore-normalise (string)
-  (setq string (replace-regexp-in-string "^the " "" string))
-  (setq string (replace-regexp-in-string "^a " "" string))
-  (setq string (replace-regexp-in-string "^an " "" string))
-  (setq string (replace-regexp-in-string " " "" string))
-  (downcase string))
+  (if (string-match "|" string)
+      (substring string (match-end 0))
+    (setq string (replace-regexp-in-string "^the " "" string))
+    (setq string (replace-regexp-in-string "^a " "" string))
+    (setq string (replace-regexp-in-string "^an " "" string))
+    (setq string (replace-regexp-in-string " " "" string))
+    (downcase string)))
 
 (defun eyesore-formats (release)
   (loop for elem in (getf release :details)
@@ -258,11 +262,11 @@
 	 for gif = (cond
 		    ((string-match "7\"" format) "7")
 		    ((string-match "^AD" format) "7")
-		    ((string-match "^CAD C" format) "cas")
 		    ((string-match "^CAD CD" format) "cd")
+		    ((string-match "^CAD C" format) "cas")
 		    ((string-match "^CAD" format) "lp")
 		    ((string-match "^BAD CD" format) "cd5")
-		    ((string-match "^BAD C" format) "cassingled")
+		    ((string-match "^BAD C" format) "cassingle")
 		    ((string-match "^BAD" format) "12")
 		    ((string-match "^AD C" format) "cassingle"))
 	 when gif
