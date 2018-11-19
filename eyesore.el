@@ -22,6 +22,7 @@
 
 (defvar eyesore-commands
   '((ryear* nil :year :releases)
+    (discography nil :years)
     (year nil :year)
     (release formats :id :group :album :details)
     (formats track :formats :tracks)
@@ -131,16 +132,24 @@
 			 (loop while sub
 			       collect
 			       (if (stringp (car sub))
-				   (pop sub)
+				   (list :type (cadr spec)
+					 :name (pop sub))
 				 (let ((value (eyesore-parse sub (cadr spec))))
 				   (loop repeat
 					 (1+
 					  (length (or (cddr (assoc
-							     (car value)
+							     (cadr value)
 							     eyesore-commands))
 						      '())))
 					 do (pop sub))
 				   value)))))))))))
+
+(defun eyesore-parse-file ()
+  (with-temp-buffer
+    (insert-file-contents "~/Catalogue/data/4ad.eye")
+    (eyesore-parse
+     (loop while (not (eobp))
+	   collect (eyesore-read)))))
 
 (provide 'eyesore)
 
