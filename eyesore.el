@@ -145,11 +145,132 @@
 				   value)))))))))))
 
 (defun eyesore-parse-file ()
-  (with-temp-buffer
-    (insert-file-contents "~/Catalogue/data/4ad.eye")
-    (eyesore-parse
-     (loop while (not (eobp))
-	   collect (eyesore-read)))))
+  (setq eyesore-data
+	(with-temp-buffer
+	  (insert-file-contents "~/Catalogue/data/4ad.eye")
+	  (eyesore-parse
+	   (loop while (not (eobp))
+		 collect (eyesore-read))))))
+
+(defun eyesore-format-year (year)
+  (insert (format "<div class='eyesore'><h1>%s</h1>\n<table>\n" year))
+  (loop for elem in (getf eyesore-data :years)
+	when (equal year (getf elem :year))
+	do (eyesore-format-releases (getf elem :releases)))
+  (insert "</table></div>"))
+
+(defun eyesore-format-releases (releases)
+  (dolist (release releases)
+    (let ((id (getf release :id)))
+      (unless (string-match "^NON" id)
+	(let ((image (or (eyesore-sleeve-image
+			  id (getf release :group)
+			  (getf release :album)
+			  (eyesore-formats release))
+			 (eyesore-external release))))
+	  (insert
+	   (format
+	    "<tr><td>%s&nbsp;%s<td><a href='%s'>%s</a> - %s<tr><td><a href='%s'><img src='%s'></a><td>%s\n\n"
+	    (eyesore-format-imgs release)
+	    (eyesore-spec id (car (eyesore-formats release)))
+	    (eyesore-group-link (getf release :group))
+	    (getf release :group)
+	    (getf release :album)
+	    (and image
+		 (format "https://eyesore.no/html/wrap/%s.html"
+			 (replace-regexp-in-string "[.]gif$" ".jpg" image)))
+	    (and image
+		 (format "https://eyesore.no/html/gif/%s" image))
+	    (mapconcat
+	     #'identity
+	     (loop for track in (getf (car (getf release :details))
+				      :tracks)
+		   when (eq (getf track :type) 'track)
+		   collect (getf track :name))
+	     ", "))))))))
+
+(defun eyesore-external (release)
+  (loop for track in (getf (car (getf release :details))
+				      :tracks)
+	when (and (eq (getf track :type) 'external)
+		  (string-match "[.]jpg$"(getf track :name)))
+	return (replace-regexp-in-string "[.]jpg$" ".gif"
+					 (getf track :name))))
+
+(defun eyesore-spec (id format)
+  (cond
+   ((string-match "AXIS" id)
+    id)
+   ((equal "CAD.*CD" format)
+    (format (replace-regexp-in-string " " "%s" format) id))
+   ((equal "BAD.*CD" format)
+    (format (replace-regexp-in-string " " "%s" format) id))
+   ((equal "CAD" format)
+    (format "CAD%S" id))
+   ((equal "CAD" format)
+    (format "CAD%S" id))
+   ((not (string-match " " format))
+    (concat format id))
+   (t
+    (concat format id))))
+
+(defun eyesore-sleeve-image (id group album formats)
+  (let* ((images (directory-files "~/Catalogue/html/gif/" nil "[.]gif$"))
+	 (direct
+	  (loop for format in formats
+		for spec = (eyesore-spec id format)
+		return (loop for image in images
+			     for bits = (split-string image "[.]")
+			     when (equal (nth 2 bits) spec)
+			     return image))))
+    (or direct
+	(loop for image in images
+	      for bits = (split-string image "[.]")
+	      when (and (equalp (eyesore-imgize group)
+				(eyesore-imgize (nth 0 bits)))
+			(equalp (eyesore-imgize album)
+				(eyesore-imgize (nth 1 bits))))
+	      return image))))
+
+(defun eyesore-imgize (string)
+  (replace-regexp-in-string "[^A-Za-z0-9]" "" string))
+
+(defun eyesore-group-link (group)
+  (format "https://eyesore.no/html/group/%s.html" (eyesore-normalise group)))
+
+(defun eyesore-normalise (string)
+  (setq string (replace-regexp-in-string "^the " "" string))
+  (setq string (replace-regexp-in-string "^a " "" string))
+  (setq string (replace-regexp-in-string "^an " "" string))
+  (setq string (replace-regexp-in-string " " "" string))
+  (downcase string))
+
+(defun eyesore-formats (release)
+  (loop for elem in (getf release :details)
+	when (eq (getf elem :type) 'formats)
+	append (if (stringp (getf elem :formats))
+		   (list (getf elem :formats))
+		 (loop for format in (getf elem :formats)
+		       collect (getf format :name)))))
+
+(defun eyesore-format-imgs (release)
+  (mapconcat
+   'identity
+   (loop for format in (eyesore-formats release)
+	 for gif = (cond
+		    ((string-match "7\"" format) "7")
+		    ((string-match "^AD" format) "7")
+		    ((string-match "^CAD C" format) "cas")
+		    ((string-match "^CAD CD" format) "cd")
+		    ((string-match "^CAD" format) "lp")
+		    ((string-match "^BAD CD" format) "cd5")
+		    ((string-match "^BAD C" format) "cassingled")
+		    ((string-match "^BAD" format) "12")
+		    ((string-match "^AD C" format) "cassingle"))
+	 when gif
+	 collect (format "<img src='https://eyesore.no/html/bullet/%s.gif'>" gif))
+   ""))
+			  
 
 (provide 'eyesore)
 
