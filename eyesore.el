@@ -226,25 +226,81 @@
     (or direct
 	(loop for image in images
 	      for bits = (split-string image "[.]")
-	      when (and (equalp (eyesore-imgize group)
+	      when (and (equalp (eyesore-normalise group)
 				(eyesore-imgize (nth 0 bits)))
-			(equalp (eyesore-imgize album)
+			(equalp (eyesore-normalise album)
 				(eyesore-imgize (nth 1 bits))))
 	      return image))))
 
 (defun eyesore-imgize (string)
-  (replace-regexp-in-string "[^A-Za-z0-9]" "" string))
+  (eyesore-normalise
+   (with-temp-buffer
+     (insert string)
+     (goto-char (point-min))
+     (forward-char 1)
+     (let ((case-fold-search nil))
+       (while (re-search-forward "[A-Z]" nil t)
+	 (goto-char (match-beginning 0))
+	 (insert " ")
+	 (forward-char 1)))
+     (goto-char (point-min))
+     (while (re-search-forward "[0-9]+" nil t)
+       (insert " ")
+       (save-excursion
+	 (goto-char (match-beginning 0))
+	 (insert " ")))
+     (buffer-string))))
 
 (defun eyesore-group-link (group)
   (format "https://eyesore.no/html/group/%s.html" (eyesore-normalise group)))
 
+(defun eyesore-number (number)
+  (let* ((low '("zero" "one" "two" "three" "four" "five" "six"
+		"seven" "eight" "nine" "ten" "eleven" "twelve" "thirteen"
+		"fourteen" "fifteen" "sixteen" "seventeen" "eighteen"
+		"nineteen"))
+	 (tens '(nil nil "twenty" "thirty" "fourty" "fifty" "sixty" "seventy"
+		     "eighty" "ninety"))
+	 (high '((1000 "thousand")
+		 (1000000 "million")
+		 (1000000000 "billion"))))
+    (cond
+     ((< number 20)
+      (elt low number))
+     ((< number 100)
+      (format "%s %s"
+	      (elt tens (/ number 10))
+	      (elt low (mod number 10))))
+     ((< number 1000)
+      (format "%s hundred %s"
+	      (elt low (/ number 100))
+	      (eyesore-number (mod number 100))))
+     (t
+      (loop for (num name) in high
+	    when (< num number (* num 1000))
+	    return (format "%s %s %s"
+			   (eyesore-number (/ number num))
+			   name
+			   (eyesore-number (mod number num))))))))
+
 (defun eyesore-normalise (string)
-  (if (string-match "|" string)
+  (if (string-match "|[*=]" string)
       (substring string (match-end 0))
+    (setq string (replace-regexp-in-string "|.*" "" string))
     (setq string (replace-regexp-in-string "^the " "" string))
     (setq string (replace-regexp-in-string "^a " "" string))
     (setq string (replace-regexp-in-string "^an " "" string))
+    (setq string (replace-regexp-in-string "&" "and" string))
+    (setq string
+	  (mapconcat
+	   (lambda (word)
+	     (if (string-match "^[0-9]+$" word)
+		 (eyesore-number (string-to-number word))
+	       word))
+	   (split-string string " " t)
+	   ""))
     (setq string (replace-regexp-in-string " " "" string))
+    (setq string (replace-regexp-in-string "[^a-z]" "" string))
     (downcase string)))
 
 (defun eyesore-formats (release)
