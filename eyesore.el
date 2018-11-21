@@ -161,15 +161,30 @@
 	do (eyesore-format-releases (getf elem :releases)))
   (insert "</table></div>"))
 
+(defun eyesore-best-format (release)
+  (loop with candidate
+	for elem in (getf release :details)
+	when (and (eq (getf elem :type) 'formats)
+		  (or (null candidate)
+		      (member "BAD"
+			      (if (stringp (getf elem :formats))
+				  (list (getf elem :formats))
+				(loop for format in (getf elem :formats)
+				      collect (getf format :name))))))
+	do (setq candidate elem)
+	finally (return candidate)))
+
 (defun eyesore-format-releases (releases)
   (dolist (release releases)
     (let ((id (getf release :id)))
-      (unless (string-match "^NON" id)
+      (when (and id
+		 (not (string-match "^NON" id)))
 	(let ((image (or (eyesore-sleeve-image
 			  id (getf release :group)
 			  (getf release :album)
 			  (eyesore-formats release))
-			 (eyesore-external release))))
+			 (eyesore-external release)))
+	      (format (eyesore-best-format release)))
 	  (insert
 	   (format
 	    "<tr><td><a href='%s'><img src='%s'></a></td><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s</td></tr>\n\n"
@@ -179,14 +194,18 @@
 	    (and image
 		 (format "https://eyesore.no/html/gif/%s" image))
 	    (eyesore-format-imgs release)
-	    (eyesore-spec id (car (eyesore-formats release)))
+	    (eyesore-spec id (let ((f (if (stringp (getf format :formats))
+					  (getf format :formats)
+					(car (getf format :formats)))))
+			       (if (stringp f)
+				   f
+				 (getf f :name))))
 	    (eyesore-group-link (getf release :group))
 	    (eyesore-string (getf release :group))
 	    (eyesore-string (getf release :album))
 	    (mapconcat
 	     #'identity
-	     (loop for track in (getf (car (getf release :details))
-				      :tracks)
+	     (loop for track in (getf format :tracks)
 		   when (eq (getf track :type) 'track)
 		   collect (getf track :name))
 	     ", "))))))))
