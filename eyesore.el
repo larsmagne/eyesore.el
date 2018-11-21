@@ -194,21 +194,41 @@
 	    (and image
 		 (format "https://eyesore.no/html/gif/%s" image))
 	    (eyesore-format-imgs release)
-	    (eyesore-spec id (let ((f (if (stringp (getf format :formats))
-					  (getf format :formats)
-					(car (getf format :formats)))))
-			       (if (stringp f)
-				   f
-				 (getf f :name))))
+	    (eyesore-spec id (car (eyesore-formats format)))
 	    (eyesore-group-link (getf release :group))
 	    (eyesore-string (getf release :group))
 	    (eyesore-string (getf release :album))
-	    (mapconcat
-	     #'identity
-	     (loop for track in (getf format :tracks)
-		   when (eq (getf track :type) 'track)
-		   collect (getf track :name))
-	     ", "))))))))
+	    (mapconcat #'identity (eyesore-tracks format) ", "))))))))
+
+(defun eyesore-tracks (format)
+  (loop for elem in (getf format :tracks)
+	append (cond
+		((eq (getf elem :type) 'track)
+		 (list (getf elem :name)))
+		((eq (getf elem :type) 'includes)
+		 (eyesore-find-tracks (getf elem :id)
+				      (getf elem :format))))))
+
+(defun eyesore-formats (format)
+  (cond
+   ((stringp (getf format :formats))
+    (list (getf format :formats)))
+   ((stringp (car (getf format :formats)))
+    (getf format :formats))
+   (t
+    (loop for f in (getf format :formats)
+	  collect (getf f :name)))))
+
+(defun eyesore-find-tracks (id format)
+  (loop for elem in (getf eyesore-data :years)
+	append
+	(loop for release in (getf elem :releases)
+	      when (equal (getf release :id) id)
+	      append
+	      (loop for elem in (getf release :details)
+		    when (and (eq (getf elem :type) 'formats)
+			      (member format (eyesore-formats elem)))
+		    return (eyesore-tracks elem)))))
 
 (defun eyesore-external (release)
   (loop for track in (getf (car (getf release :details))
