@@ -159,7 +159,7 @@
   (loop for elem in (getf eyesore-data :years)
 	when (equal year (getf elem :year))
 	do (eyesore-format-releases (getf elem :releases)))
-  (insert "</table></div>"))
+  (insert "</table></div>\nThis post is part of the <a href='https://lars.ingebrigtsen.no/2018/11/19/4ad-1980/'>chronological look at all 4AD releases</a>, year by year.\n\n*) Missing from Spotify.\n"))
 
 (defun eyesore-best-format (release)
   (loop with candidate
@@ -182,7 +182,7 @@
 	(let ((image (or (eyesore-sleeve-image
 			  id (getf release :group)
 			  (getf release :album)
-			  (eyesore-formats release))
+			  (eyesore-format-names release))
 			 (eyesore-external release)))
 	      (format (eyesore-best-format release)))
 	  (insert
@@ -342,7 +342,7 @@
     (setq string (replace-regexp-in-string "[^a-z]" "" string))
     (downcase string)))
 
-(defun eyesore-formats (release)
+(defun eyesore-format-names (release)
   (loop for elem in (getf release :details)
 	when (eq (getf elem :type) 'formats)
 	append (if (stringp (getf elem :formats))
@@ -353,7 +353,7 @@
 (defun eyesore-format-imgs (release)
   (mapconcat
    'identity
-   (loop for format in (eyesore-formats release)
+   (loop for format in (eyesore-format-names release)
 	 for gif = (cond
 		    ((string-match "7\"" format) "7")
 		    ((string-match "^AD" format) "7")
