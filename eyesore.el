@@ -204,7 +204,20 @@
   (loop for elem in (getf format :tracks)
 	append (cond
 		((eq (getf elem :type) 'track)
-		 (list (getf elem :name)))
+		 (let ((name (getf elem :name))
+		       nn)
+		   (loop for d in (getf elem :details)
+			 when (getf d :name)
+			 return (setq nn 
+				      (format "%s (%s)" name (getf d :name)))
+			 do (cond
+			     ((eq (getf d :type) 'remix)
+			      (setq nn (format "%s (remix)" name)))
+			     ((eq (getf d :type) 'rerecorded)
+			      (setq nn (format "%s (rerecorded)" name)))
+			     ((eq (getf d :type) 'live)
+			      (setq nn (format "%s (live)" name)))))
+		   (list (or nn name))))
 		((eq (getf elem :type) 'includes)
 		 (eyesore-find-tracks (getf elem :id)
 				      (getf elem :format))))))
