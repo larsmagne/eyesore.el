@@ -164,13 +164,14 @@
 (defun eyesore-best-format (release)
   (loop with candidate
 	for elem in (getf release :details)
+	for formats = (if (stringp (getf elem :formats))
+			  (list (getf elem :formats))
+			(loop for format in (getf elem :formats)
+			      collect (getf format :name)))
 	when (and (eq (getf elem :type) 'formats)
 		  (or (null candidate)
-		      (member "BAD"
-			      (if (stringp (getf elem :formats))
-				  (list (getf elem :formats))
-				(loop for format in (getf elem :formats)
-				      collect (getf format :name))))))
+		      (member "BAD" formats)
+		      (member "BAD CD" formats)))
 	do (setq candidate elem)
 	finally (return candidate)))
 
