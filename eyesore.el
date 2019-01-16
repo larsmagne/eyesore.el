@@ -27,6 +27,8 @@
     (release formats :id :group :album :details)
     (formats track :formats :tracks)
     (includes nil :id :format)
+    (alias nil :alias)
+    (unique nil :unique)
     (date nil :date)
     (track nil :name :details)
     (writer nil :name)
@@ -43,9 +45,13 @@
     (featured nil :name)
     (studio nil :name)
     (sleeve nil :name)
+    (arranger nil :name)
+    (coarranger nil :name)
     (excerpt nil)
     (remix nil)
     (live nil)
+    (coremixer nil :name)
+    (remixer nil :name)
     (engineer nil :name)
     (group nil :name)
     (ephemera nil :name)))
@@ -175,31 +181,36 @@
 	do (setq candidate elem)
 	finally (return candidate)))
 
-(defun eyesore-format-releases (releases)
+(defun eyesore-format-releases (releases &optional best-only)
   (dolist (release releases)
     (let ((id (getf release :id)))
       (when (and id
 		 (not (string-match "^NON" id)))
-	(let ((image (or (eyesore-sleeve-image
-			  id (getf release :group)
-			  (getf release :album)
-			  (eyesore-format-names release))
-			 (eyesore-external release)))
-	      (format (eyesore-best-format release)))
-	  (insert
-	   (format
-	    "<tr><td><a href='%s'><img src='%s'></a></td><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s</td></tr>\n\n"
-	    (and image
-		 (format "https://eyesore.no/html/wrap/%s.html"
-			 (replace-regexp-in-string "[.]gif$" ".jpg" image)))
-	    (and image
-		 (format "https://eyesore.no/html/gif/%s" image))
-	    (eyesore-format-imgs release)
-	    (eyesore-spec id (car (eyesore-formats format)))
-	    (eyesore-group-link (getf release :group))
-	    (eyesore-string (getf release :group))
-	    (eyesore-string (getf release :album))
-	    (mapconcat #'identity (eyesore-tracks format) ", "))))))))
+	(dolist (format
+		 (if best-only
+		     (list (eyesore-best-format release))
+		   (loop for elem in (getf release :details)
+			 when (eq (getf elem :type) 'formats)
+			 collect elem)))
+	  (let ((image (or (eyesore-sleeve-image
+			    id (getf release :group)
+			    (getf release :album)
+			    (eyesore-format-names format))
+			   (eyesore-external release))))
+	    (insert
+	     (format
+	      "<tr><td>%s</td><td>%s&nbsp;%s<br><a href='%s'>%s</a> -- %s<p>%s</td></tr>\n\n"
+	      (if (not image)
+		  ""
+		(format "<a href='https://eyesore.no/html/wrap/%s.html'><img src='https://eyesore.no/html/gif/%s'></a>"
+			(replace-regexp-in-string "[.]gif$" ".jpg" image)
+			image))
+	      (eyesore-format-imgs release)
+	      (eyesore-spec id (car (eyesore-formats format)))
+	      (eyesore-group-link (getf release :group))
+	      (eyesore-string (getf release :group))
+	      (eyesore-string (getf release :album))
+	      (mapconcat #'identity (eyesore-tracks format) ", ")))))))))
 
 (defun eyesore-tracks (format)
   (loop for elem in (getf format :tracks)
@@ -208,10 +219,14 @@
 		 (let ((name (getf elem :name))
 		       nn)
 		   (loop for d in (getf elem :details)
-			 when (getf d :name)
+			 when (and (getf d :name)
+				   (null (getf d :type)))
 			 return (setq nn 
 				      (format "%s (%s)" name (getf d :name)))
 			 do (cond
+			     ((eq (getf d :type) 'group)
+			      (setq name (format "%s / %s" (getf d :name)
+						 name)))
 			     ((eq (getf d :type) 'remix)
 			      (setq nn (format "%s (remix)" name)))
 			     ((eq (getf d :type) 'rerecorded)
@@ -277,6 +292,17 @@
 			     when (equal (nth 2 bits) spec)
 			     return image))))
     (or direct
+	;; Find a good match.
+	(loop for image in images
+	      for bits = (split-string image "[.]")
+	      when (and (equalp (eyesore-normalise group)
+				(eyesore-imgize (nth 0 bits)))
+			(equalp (eyesore-normalise album)
+				(eyesore-imgize (nth 1 bits)))
+			(eyesore-format-equal formats
+					      (eyesore-imgize (nth 2 bits))))
+	      return image)
+	;; Just match group/album.
 	(loop for image in images
 	      for bits = (split-string image "[.]")
 	      when (and (equalp (eyesore-normalise group)
@@ -284,6 +310,21 @@
 			(equalp (eyesore-normalise album)
 				(eyesore-imgize (nth 1 bits))))
 	      return image))))
+
+(defun eyesore-format-equal (formats bit)
+  (loop for format in formats
+	when (equal (cond
+		     ((string-match "^AD" format) "7")
+		     ((string-match "^CAD CD" format) "cd")
+		     ((string-match "^CAD C" format) "cas")
+		     ((string-match "^CAD" format) "lp")
+		     ((string-match "^BAD CD" format) "cdsingle")
+		     ((string-match "^BAD C" format) "cassingle")
+		     ((string-match "^BAD" format) "ep")
+		     ((string-match "^AD C" format) "cassingle"))
+		    bit)
+	return t))
+
 
 (defun eyesore-imgize (string)
   (eyesore-normalise
@@ -356,7 +397,7 @@
     (setq string (replace-regexp-in-string "[^a-z]" "" string))
     (downcase string)))
 
-(defun eyesore-format-names (release)
+(defun eyesore-release-format-names (release)
   (loop for elem in (getf release :details)
 	when (eq (getf elem :type) 'formats)
 	append (if (stringp (getf elem :formats))
@@ -364,10 +405,16 @@
 		 (loop for format in (getf elem :formats)
 		       collect (getf format :name)))))
 
+(defun eyesore-format-names (format)
+  (if (stringp (getf format :formats))
+      (list (getf format :formats))
+    (loop for format in (getf format :formats)
+	  collect (getf format :name))))
+
 (defun eyesore-format-imgs (release)
   (mapconcat
    'identity
-   (loop for format in (eyesore-format-names release)
+   (loop for format in (eyesore-release-format-names release)
 	 for gif = (cond
 		    ((string-match "7\"" format) "7")
 		    ((string-match "^AD" format) "7")
